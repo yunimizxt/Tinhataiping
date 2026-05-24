@@ -59,8 +59,8 @@ export function Fortress({ player, isOpponent, label }: Props) {
   const flagSize = Math.round(18 * scale);
   const cellSize = Math.round(52 * scale);
 
-  // Dome: half-span based on screen width so it always fills nearly the full width
-  const halfSpan = Math.round(screenW * 0.44);
+  // Dome: fixed proportional size that scales with device, not raw screen width
+  const halfSpan = Math.round(170 * scale);
 
   // Content height: flag row + gap + fortress body (2 cell rows + padding + border)
   const contentH = Math.round(flagSize + 4 + cellSize * 2 + 4 + 16 + 6);
