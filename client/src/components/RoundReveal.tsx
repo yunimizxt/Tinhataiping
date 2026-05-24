@@ -48,8 +48,9 @@ function formatProgress(p: RoundResult['p1Progress']): string {
     case 'built_shield':    return '🛡 Built a shield';
     case 'built_weapon':    return '⚔️ Built a weapon!';
     case 'repaired_flag':   return '🔧 Repaired flag';
-    case 'repaired_shield': return '🔧 Repaired shield';
-    case 'attacked':        return `💥 Hit ${p.hit}!`;
+    case 'repaired_shield':   return '🔧 Repaired shield';
+    case 'repaired_fortress': return '🔧 Repaired fortress';
+    case 'attacked':          return `💥 Hit ${p.hit}!`;
     default: return '';
   }
 }

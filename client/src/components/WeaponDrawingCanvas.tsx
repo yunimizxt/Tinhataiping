@@ -1,6 +1,6 @@
 import React, { useRef, useState } from 'react';
 import {
-  View, Text, TouchableOpacity, StyleSheet, PanResponder, Platform,
+  View, Text, TouchableOpacity, StyleSheet, PanResponder, Modal,
 } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { colors } from '../theme/colors';
@@ -11,8 +11,8 @@ interface Props {
   onSkip: () => void;
 }
 
-const CANVAS_W = 260;
-const CANVAS_H = 160;
+export const DRAW_CANVAS_W = 260;
+export const DRAW_CANVAS_H = 160;
 
 export function WeaponDrawingCanvas({ playerName, onDone, onSkip }: Props) {
   const [paths, setPaths] = useState<string[]>([]);
@@ -50,69 +50,63 @@ export function WeaponDrawingCanvas({ playerName, onDone, onSkip }: Props) {
   }
 
   function handleDone() {
-    const combined = paths.join(' ');
-    onDone(combined || 'M 0,0');
+    onDone(paths.join(' ') || 'M 0,0');
   }
 
-  const allPathData = paths.join(' ');
-
   return (
-    <View style={styles.overlay}>
-      <View style={styles.card}>
-        <Text style={styles.title}>⚔️ Draw Your Weapon!</Text>
-        <Text style={styles.subtitle}>{playerName} — draw a cannon, plane, or anything!</Text>
+    // Modal ensures the canvas always renders above everything — shields, game board, etc.
+    <Modal visible transparent animationType="fade">
+      <View style={styles.overlay}>
+        <View style={styles.card}>
+          <Text style={styles.title}>⚔️ Draw Your Weapon!</Text>
+          <Text style={styles.subtitle}>{playerName} — draw a cannon, plane, sword…</Text>
 
-        {/* Drawing canvas */}
-        <View
-          style={styles.canvas}
-          {...panResponder.panHandlers}
-        >
-          <Svg width={CANVAS_W} height={CANVAS_H}>
-            {paths.map((d, i) => (
-              <Path
-                key={i}
-                d={d}
-                stroke={colors.inkBlack}
-                strokeWidth={3}
-                fill="none"
-                strokeLinecap="round"
-                strokeLinejoin="round"
-              />
-            ))}
-          </Svg>
-          {paths.length === 0 && (
-            <Text style={styles.placeholder}>Draw here ✏️</Text>
-          )}
-        </View>
+          <View style={styles.canvas} {...panResponder.panHandlers}>
+            <Svg width={DRAW_CANVAS_W} height={DRAW_CANVAS_H}>
+              {paths.map((d, i) => (
+                <Path
+                  key={i}
+                  d={d}
+                  stroke={colors.inkBlack}
+                  strokeWidth={3}
+                  fill="none"
+                  strokeLinecap="round"
+                  strokeLinejoin="round"
+                />
+              ))}
+            </Svg>
+            {paths.length === 0 && (
+              <Text style={styles.placeholder}>Draw here ✏️</Text>
+            )}
+          </View>
 
-        {/* Buttons */}
-        <View style={styles.buttons}>
-          <TouchableOpacity style={styles.clearBtn} onPress={handleClear}>
-            <Text style={styles.clearText}>Clear</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.skipBtn} onPress={onSkip}>
-            <Text style={styles.skipText}>Skip</Text>
-          </TouchableOpacity>
-          <TouchableOpacity
-            style={[styles.doneBtn, paths.length === 0 && styles.disabledBtn]}
-            onPress={handleDone}
-            disabled={paths.length === 0}
-          >
-            <Text style={styles.doneText}>Done ✓</Text>
-          </TouchableOpacity>
+          <View style={styles.buttons}>
+            <TouchableOpacity style={styles.clearBtn} onPress={handleClear}>
+              <Text style={styles.clearText}>Clear</Text>
+            </TouchableOpacity>
+            <TouchableOpacity style={styles.skipBtn} onPress={onSkip}>
+              <Text style={styles.skipText}>Skip</Text>
+            </TouchableOpacity>
+            <TouchableOpacity
+              style={[styles.doneBtn, paths.length === 0 && styles.disabledBtn]}
+              onPress={handleDone}
+              disabled={paths.length === 0}
+            >
+              <Text style={styles.doneText}>Done ✓</Text>
+            </TouchableOpacity>
+          </View>
         </View>
       </View>
-    </View>
+    </Modal>
   );
 }
 
 const styles = StyleSheet.create({
   overlay: {
-    ...StyleSheet.absoluteFill,
+    flex: 1,
     backgroundColor: 'rgba(0,0,0,0.65)',
     alignItems: 'center',
     justifyContent: 'center',
-    zIndex: 100,
   },
   card: {
     backgroundColor: colors.paperBg,
@@ -120,13 +114,13 @@ const styles = StyleSheet.create({
     padding: 20,
     alignItems: 'center',
     gap: 12,
-    width: CANVAS_W + 40,
+    width: DRAW_CANVAS_W + 40,
   },
   title: { fontSize: 20, fontWeight: 'bold', color: colors.inkBlack },
   subtitle: { fontSize: 12, color: colors.stoneDark, textAlign: 'center' },
   canvas: {
-    width: CANVAS_W,
-    height: CANVAS_H,
+    width: DRAW_CANVAS_W,
+    height: DRAW_CANVAS_H,
     backgroundColor: colors.white,
     borderWidth: 2,
     borderColor: colors.stoneDark,

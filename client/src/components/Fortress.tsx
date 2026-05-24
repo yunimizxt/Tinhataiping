@@ -1,6 +1,6 @@
 import React from 'react';
 import { View, Text, StyleSheet } from 'react-native';
-import Svg, { Path, G } from 'react-native-svg';
+import Svg, { Path } from 'react-native-svg';
 import { PlayerState } from '@tinhataiping/shared';
 import { CharacterGrid } from './CharacterGrid';
 import { colors } from '../theme/colors';
@@ -11,37 +11,46 @@ interface Props {
   label?: string;
 }
 
-const FORTRESS_WIDTH = 140;
-const SHIELD_BASE_RADIUS = 84;
-const SHIELD_GAP = 14;
+// Canvas dimensions used in WeaponDrawingCanvas
+const DRAW_CANVAS_W = 260;
+const DRAW_CANVAS_H = 160;
 
-// Draws a semicircle arc above the fortress
-function ShieldArcs({ shields }: { shields: number }) {
+const BODY_W = 140;
+// Shield arcs are wider than the fortress body so they visually wrap around the sides
+const SHIELD_INNER_R = 110;   // arc spans 220px wide, extends 40px beyond each side
+const SHIELD_OUTER_R = 132;   // arc spans 264px wide
+
+function ShieldDome({ shields }: { shields: number }) {
   if (shields === 0) return null;
-  const cx = FORTRESS_WIDTH / 2;
-  const svgHeight = SHIELD_BASE_RADIUS + SHIELD_GAP * (shields - 1) + 10;
 
-  const arcs = Array.from({ length: shields }, (_, i) => {
-    const r = SHIELD_BASE_RADIUS + i * SHIELD_GAP;
-    const x1 = cx - r;
-    const x2 = cx + r;
-    const y = svgHeight - 6;
-    // SVG arc: move to left, arc to right (top half = sweep-flag 0)
-    return `M ${x1},${y} A ${r},${r} 0 0,1 ${x2},${y}`;
-  });
+  const outerR = shields >= 2 ? SHIELD_OUTER_R : SHIELD_INNER_R;
+  // SVG must be wide enough to contain the largest arc
+  const svgW = outerR * 2 + 6;
+  const svgH = outerR + 6;
+  const cx = svgW / 2;
+  // Arc flat edge sits at the bottom of the SVG
+  const y = svgH - 2;
 
   return (
-    <Svg width={FORTRESS_WIDTH} height={svgHeight} style={styles.shieldSvg}>
-      {arcs.map((d, i) => (
-        <Path
-          key={i}
-          d={d}
-          stroke={colors.shieldBlue}
-          strokeWidth={3 + i}
-          fill="none"
-          strokeLinecap="round"
-        />
-      ))}
+    // Negative marginBottom pulls the fortress body up so it sits inside the dome
+    <Svg width={svgW} height={svgH} style={styles.domeSvg}>
+      {Array.from({ length: shields }, (_, i) => {
+        const r = i === 0 ? SHIELD_INNER_R : SHIELD_OUTER_R;
+        const x1 = cx - r;
+        const x2 = cx + r;
+        // Slight fill to make the shield feel like a bubble
+        const fillOpacity = i === 0 ? 0.06 : 0.04;
+        return (
+          <Path
+            key={i}
+            d={`M ${x1},${y} A ${r},${r} 0 0,1 ${x2},${y}`}
+            stroke={colors.shieldBlue}
+            strokeWidth={3 + i * 2}
+            fill={`rgba(34,85,170,${fillOpacity})`}
+            strokeLinecap="round"
+          />
+        );
+      })}
     </Svg>
   );
 }
@@ -51,8 +60,8 @@ export function Fortress({ player, isOpponent, label }: Props) {
     <View style={[styles.container, isOpponent && styles.flipped]}>
       {label && <Text style={[styles.label, isOpponent && styles.flippedText]}>{label}</Text>}
 
-      {/* Shield arcs sit above the fortress body */}
-      <ShieldArcs shields={player.shields} />
+      {/* Shield dome — sits above the fortress body, wider than it */}
+      <ShieldDome shields={player.shields} />
 
       {/* Fortress body */}
       <View style={styles.body}>
@@ -68,22 +77,26 @@ export function Fortress({ player, isOpponent, label }: Props) {
         ))}
       </View>
 
-      {/* Drawn weapon */}
+      {/* Drawn weapon — viewBox scales path from drawing canvas to display size */}
       {player.hasWeapon && (
         <View style={styles.weaponBox}>
           {player.weaponDrawing ? (
-            <Svg width={60} height={40}>
+            <Svg
+              width={80}
+              height={50}
+              viewBox={`0 0 ${DRAW_CANVAS_W} ${DRAW_CANVAS_H}`}
+            >
               <Path
                 d={player.weaponDrawing}
                 stroke={colors.inkBlack}
-                strokeWidth={2}
+                strokeWidth={4}
                 fill="none"
                 strokeLinecap="round"
                 strokeLinejoin="round"
               />
             </Svg>
           ) : (
-            <Text style={styles.weaponText}>⚔️</Text>
+            <Text style={styles.weaponEmoji}>⚔️</Text>
           )}
         </View>
       )}
@@ -105,21 +118,22 @@ function getBuildHint(p: PlayerState): string {
 }
 
 const styles = StyleSheet.create({
-  container: { alignItems: 'center', gap: 2 },
+  container: { alignItems: 'center', gap: 0 },
   flipped: { transform: [{ scaleY: -1 }] },
   flippedText: { transform: [{ scaleY: -1 }] },
-  label: { fontSize: 12, color: colors.stoneDark, fontWeight: '600' },
-  shieldSvg: { marginBottom: -6 },
+  label: { fontSize: 12, color: colors.stoneDark, fontWeight: '600', marginBottom: 2 },
+  // Pull the fortress body upward so it sits just inside the dome's open bottom
+  domeSvg: { marginBottom: -18 },
   body: {
     backgroundColor: colors.stoneMid,
     borderWidth: 3,
     borderColor: colors.stoneDark,
     borderRadius: 8,
     padding: 8,
-    width: FORTRESS_WIDTH,
+    width: BODY_W,
     alignItems: 'center',
   },
-  flagRow: { flexDirection: 'row', gap: 6, marginTop: 4 },
+  flagRow: { flexDirection: 'row', gap: 6, marginTop: 6 },
   flag: { fontSize: 18 },
   weaponBox: {
     marginTop: 4,
@@ -127,8 +141,8 @@ const styles = StyleSheet.create({
     borderColor: colors.lightGray,
     borderRadius: 6,
     padding: 4,
-    backgroundColor: 'rgba(255,255,255,0.6)',
+    backgroundColor: 'rgba(255,255,255,0.7)',
   },
-  weaponText: { fontSize: 20 },
+  weaponEmoji: { fontSize: 20 },
   hint: { fontSize: 10, color: colors.gray, marginTop: 2 },
 });

@@ -17,6 +17,7 @@ export type ProgressEvent =
   | { type: 'built_weapon' }
   | { type: 'repaired_flag' }
   | { type: 'repaired_shield' }
+  | { type: 'repaired_fortress' }
   | { type: 'attacked'; hit: HitResult };
 
 export interface PlayerState {

@@ -25,24 +25,30 @@ export function isAttackPhase(player: PlayerState): boolean {
   return player.flags === MAX_FLAGS && player.shields === MAX_SHIELDS && player.hasWeapon;
 }
 
+export const MAX_FORTRESS_HP = 4;
+
 export function needsRepair(player: PlayerState): boolean {
   const hasBeyondFlags = player.shields > 0 || player.hasWeapon;
   const hasBeyondShields = player.hasWeapon;
   return (
+    player.fortressHp < MAX_FORTRESS_HP ||
     (hasBeyondFlags && player.flags < MAX_FLAGS) ||
     (hasBeyondShields && player.shields < MAX_SHIELDS)
   );
 }
 
 // What a winner earns during the build phase (auto-progressive, no choice)
+// Priority: repair flags → repair shields → repair fortress → build next tier
 export function getBuildProgress(winner: PlayerState): ProgressEvent {
   if (needsRepair(winner)) {
-    if (winner.flags < MAX_FLAGS) return { type: 'repaired_flag' };
-    return { type: 'repaired_shield' };
+    const hasBeyondFlags = winner.shields > 0 || winner.hasWeapon;
+    const hasBeyondShields = winner.hasWeapon;
+    if (hasBeyondFlags && winner.flags < MAX_FLAGS) return { type: 'repaired_flag' };
+    if (hasBeyondShields && winner.shields < MAX_SHIELDS) return { type: 'repaired_shield' };
+    if (winner.fortressHp < MAX_FORTRESS_HP) return { type: 'repaired_fortress' };
   }
   if (winner.flags < MAX_FLAGS) return { type: 'built_flag' };
   if (winner.shields < MAX_SHIELDS) return { type: 'built_shield' };
-  // flags === 3 && shields === 2 but no weapon yet — trigger drawing phase
   return { type: 'built_weapon' };
 }
 
@@ -66,6 +72,9 @@ export function applyProgress(player: PlayerState, event: ProgressEvent): Player
       break;
     case 'built_weapon':
       p.hasWeapon = true;
+      break;
+    case 'repaired_fortress':
+      p.fortressHp = Math.min(MAX_FORTRESS_HP, p.fortressHp + 1);
       break;
   }
   return p;
