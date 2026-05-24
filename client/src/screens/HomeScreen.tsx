@@ -38,6 +38,12 @@ export function HomeScreen({ navigation }: Props) {
             onPress={() => navigation.navigate('Lobby')}
           />
           <MenuButton
+            label="vs Computer"
+            cn="對戰電腦"
+            emoji="🤖"
+            onPress={() => navigation.navigate('AIGame')}
+          />
+          <MenuButton
             label="Local 2-Player"
             cn="本地雙人"
             emoji="👥"

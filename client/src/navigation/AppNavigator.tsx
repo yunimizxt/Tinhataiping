@@ -5,12 +5,14 @@ import { HomeScreen } from '../screens/HomeScreen';
 import { LobbyScreen } from '../screens/LobbyScreen';
 import { GameScreen } from '../screens/GameScreen';
 import { LocalGameScreen } from '../screens/LocalGameScreen';
+import { AIGameScreen } from '../screens/AIGameScreen';
 import { ResultScreen } from '../screens/ResultScreen';
 
 export type RootStackParamList = {
   Home: undefined;
   Lobby: undefined;
   LocalGame: undefined;
+  AIGame: undefined;
   Game: { mode: 'online' | 'local' };
   Result: undefined;
 };
@@ -31,6 +33,7 @@ export function AppNavigator() {
         <Stack.Screen name="Home" component={HomeScreen} options={{ title: '天下太平' }} />
         <Stack.Screen name="Lobby" component={LobbyScreen} options={{ title: 'Online Game 網上對戰' }} />
         <Stack.Screen name="LocalGame" component={LocalGameScreen} options={{ title: 'Local Game 本地對戰' }} />
+        <Stack.Screen name="AIGame" component={AIGameScreen} options={{ title: 'vs Computer 對戰電腦' }} />
         <Stack.Screen name="Game" component={GameScreen} options={{ title: '天下太平' }} />
         <Stack.Screen name="Result" component={ResultScreen} options={{ title: 'Result 結果', headerBackVisible: false }} />
       </Stack.Navigator>

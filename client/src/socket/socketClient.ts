@@ -1,13 +1,8 @@
 import { io, Socket } from 'socket.io-client';
-import {
-  GameState,
-  RoundResult,
-  AttackTarget,
-  Gesture,
-} from '@tinhataiping/shared';
+import { GameState, RoundResult, Gesture } from '@tinhataiping/shared';
 import { useGameStore } from '../store/gameStore';
 
-const SERVER_URL = 'http://localhost:3001'; // update for production
+const SERVER_URL = 'http://localhost:3001';
 
 let socket: Socket | null = null;
 
@@ -45,31 +40,21 @@ function registerHandlers(s: Socket) {
   s.on('game:opponent_chose', () => {
     const gs = store().gameState;
     if (!gs) return;
-    const myId = s.id;
-    const isP1 = gs.p1.id === myId;
-    const updated: GameState = {
+    const isP1 = gs.p1.id === s.id;
+    store().setGameState({
       ...gs,
       p1: isP1 ? gs.p1 : { ...gs.p1, hasChosen: true },
       p2: isP1 ? { ...gs.p2, hasChosen: true } : gs.p2,
-    };
-    store().setGameState(updated);
+    });
   });
 
   s.on('game:round_result', ({ result, gameState }: { result: RoundResult; gameState: GameState }) => {
     store().setLastRoundResult(result);
-    store().setPendingAttackOptions(null);
     store().setGameState(gameState);
   });
 
-  s.on('game:attack_choice', ({
-    winnerId,
-    options,
-    gameState,
-  }: { winnerId: string; options: AttackTarget[]; gameState: GameState }) => {
+  s.on('game:state_update', ({ gameState }: { gameState: GameState }) => {
     store().setGameState(gameState);
-    if (winnerId === s.id) {
-      store().setPendingAttackOptions(options);
-    }
   });
 
   s.on('game:over', ({ gameState }: { gameState: GameState }) => {
@@ -95,10 +80,6 @@ export function joinRoom(roomId: string, playerName: string) {
 
 export function submitGesture(roomId: string, gesture: Gesture) {
   getSocket().emit('game:gesture', { roomId, gesture });
-}
-
-export function submitAttackTarget(roomId: string, target: AttackTarget) {
-  getSocket().emit('game:attack_target', { roomId, target });
 }
 
 export function requestRematch(roomId: string) {

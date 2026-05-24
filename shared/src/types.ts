@@ -1,17 +1,12 @@
 export type Gesture = 'rock' | 'paper' | 'scissors';
 
-export type AttackTarget =
-  | 'base'      // outermost layer: shield → flag → fortress character
-  | 'cannon'    // destroy opponent's cannon
-  | 'aircraft'; // destroy opponent's aircraft
-
-export type HitResult = 'shield' | 'flag' | 'fortress' | 'cannon' | 'aircraft';
+export type HitResult = 'shield' | 'flag' | 'fortress';
 
 export type GamePhase =
-  | 'waiting'        // room created, awaiting opponent
-  | 'choosing'       // both choosing gesture (10s)
-  | 'resolving'      // brief reveal of both gestures
-  | 'attack_choice'  // winner in attack phase picks target (3s)
+  | 'waiting'       // room created, awaiting opponent
+  | 'drawing'       // winner is drawing their weapon (local only)
+  | 'choosing'      // both choosing gesture (10s)
+  | 'resolving'     // brief reveal of both gestures
   | 'gameover';
 
 export type RoundOutcome = 'p1_wins' | 'p2_wins' | 'draw';
@@ -19,22 +14,21 @@ export type RoundOutcome = 'p1_wins' | 'p2_wins' | 'draw';
 export type ProgressEvent =
   | { type: 'built_flag' }
   | { type: 'built_shield' }
-  | { type: 'built_cannon' }
-  | { type: 'built_aircraft' }
+  | { type: 'built_weapon' }
   | { type: 'repaired_flag' }
   | { type: 'repaired_shield' }
-  | { type: 'attacked'; target: AttackTarget; hit: HitResult };
+  | { type: 'attacked'; hit: HitResult };
 
 export interface PlayerState {
   id: string;
   name: string;
-  fortressHp: number;   // 0-4, the 天下太平 characters remaining
-  flags: number;        // 0-3
-  shields: number;      // 0-2 (requires flags === 3)
-  hasCannon: boolean;   // requires flags === 3 && shields === 2
-  hasAircraft: boolean; // requires flags === 3 && shields === 2
+  fortressHp: number;      // 0-4, the 天下太平 characters remaining
+  flags: number;           // 0-3
+  shields: number;         // 0-2 (requires flags === 3)
+  hasWeapon: boolean;      // requires flags === 3 && shields === 2; drawn freehand
+  weaponDrawing: string | null; // SVG path data of the drawn weapon
   gesture: Gesture | null;
-  hasChosen: boolean;   // visible to opponent (not the gesture value)
+  hasChosen: boolean;      // visible to opponent (not the gesture value)
 }
 
 export interface RoundResult {
@@ -52,9 +46,8 @@ export interface GameState {
   round: number;
   p1: PlayerState;
   p2: PlayerState;
-  pendingAttackWinnerId: string | null; // set during attack_choice phase
   roundHistory: RoundResult[];
-  winner: string | null; // player id of winner
+  winner: string | null;
 }
 
 // Socket payload types
@@ -72,9 +65,9 @@ export interface GesturePayload {
   gesture: Gesture;
 }
 
-export interface AttackTargetPayload {
+export interface WeaponDrawingPayload {
   roomId: string;
-  target: AttackTarget;
+  drawingPath: string;
 }
 
 export interface RematchPayload {

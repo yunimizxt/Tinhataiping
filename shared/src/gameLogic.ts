@@ -4,7 +4,6 @@ import {
   PlayerState,
   GameState,
   ProgressEvent,
-  AttackTarget,
   HitResult,
   RoundResult,
 } from './types';
@@ -23,46 +22,35 @@ export function resolveGesture(g1: Gesture, g2: Gesture): RoundOutcome {
 }
 
 export function isAttackPhase(player: PlayerState): boolean {
-  return (
-    player.flags === MAX_FLAGS &&
-    player.shields === MAX_SHIELDS &&
-    (player.hasCannon || player.hasAircraft)
-  );
+  return player.flags === MAX_FLAGS && player.shields === MAX_SHIELDS && player.hasWeapon;
 }
 
 export function needsRepair(player: PlayerState): boolean {
-  // Player has advanced beyond a tier but lost a component from that tier
-  const hasBeyondFlags = player.shields > 0 || player.hasCannon || player.hasAircraft;
-  const hasBeyondShields = player.hasCannon || player.hasAircraft;
+  const hasBeyondFlags = player.shields > 0 || player.hasWeapon;
+  const hasBeyondShields = player.hasWeapon;
   return (
     (hasBeyondFlags && player.flags < MAX_FLAGS) ||
     (hasBeyondShields && player.shields < MAX_SHIELDS)
   );
 }
 
-// Determines what a winner automatically earns during the build phase
+// What a winner earns during the build phase (auto-progressive, no choice)
 export function getBuildProgress(winner: PlayerState): ProgressEvent {
-  // Repair takes priority
   if (needsRepair(winner)) {
     if (winner.flags < MAX_FLAGS) return { type: 'repaired_flag' };
     return { type: 'repaired_shield' };
   }
   if (winner.flags < MAX_FLAGS) return { type: 'built_flag' };
   if (winner.shields < MAX_SHIELDS) return { type: 'built_shield' };
-  if (!winner.hasCannon) return { type: 'built_cannon' };
-  return { type: 'built_aircraft' };
+  // flags === 3 && shields === 2 but no weapon yet — trigger drawing phase
+  return { type: 'built_weapon' };
 }
 
-// Resolve what the attack hits (called with winner's chosen target)
-export function resolveAttack(target: AttackTarget, defender: PlayerState): ProgressEvent {
-  if (target === 'cannon') return { type: 'attacked', target, hit: 'cannon' };
-  if (target === 'aircraft') return { type: 'attacked', target, hit: 'aircraft' };
-  // target === 'base': peel outermost layer
-  const hit: HitResult =
-    defender.shields > 0 ? 'shield' :
-    defender.flags > 0 ? 'flag' :
-    'fortress';
-  return { type: 'attacked', target, hit };
+// Attack always hits outermost layer: shield → flag → fortress character
+export function getAttackHit(defender: PlayerState): HitResult {
+  if (defender.shields > 0) return 'shield';
+  if (defender.flags > 0) return 'flag';
+  return 'fortress';
 }
 
 export function applyProgress(player: PlayerState, event: ProgressEvent): PlayerState {
@@ -76,11 +64,8 @@ export function applyProgress(player: PlayerState, event: ProgressEvent): Player
     case 'repaired_shield':
       p.shields = Math.min(MAX_SHIELDS, p.shields + 1);
       break;
-    case 'built_cannon':
-      p.hasCannon = true;
-      break;
-    case 'built_aircraft':
-      p.hasAircraft = true;
+    case 'built_weapon':
+      p.hasWeapon = true;
       break;
   }
   return p;
@@ -92,22 +77,11 @@ export function applyDamage(defender: PlayerState, hit: HitResult): PlayerState 
     case 'shield':   p.shields = Math.max(0, p.shields - 1); break;
     case 'flag':     p.flags = Math.max(0, p.flags - 1); break;
     case 'fortress': p.fortressHp = Math.max(0, p.fortressHp - 1); break;
-    case 'cannon':   p.hasCannon = false; break;
-    case 'aircraft': p.hasAircraft = false; break;
   }
   return p;
 }
 
-// Returns valid attack targets for the attacker given the defender's state
-export function getAttackOptions(defender: PlayerState): AttackTarget[] {
-  const opts: AttackTarget[] = ['base'];
-  if (defender.hasCannon) opts.push('cannon');
-  if (defender.hasAircraft) opts.push('aircraft');
-  return opts;
-}
-
-// Apply a full round once gestures are known AND (if attack phase) target is chosen
-export function applyRound(state: GameState, attackTarget?: AttackTarget): GameState {
+export function applyRound(state: GameState): GameState {
   const { p1, p2 } = state;
   const outcome = resolveGesture(p1.gesture!, p2.gesture!);
 
@@ -118,18 +92,18 @@ export function applyRound(state: GameState, attackTarget?: AttackTarget): GameS
 
   if (outcome === 'p1_wins') {
     if (isAttackPhase(p1)) {
-      const target = attackTarget ?? 'base';
-      p1Progress = resolveAttack(target, newP2);
-      newP2 = applyDamage(newP2, (p1Progress as Extract<ProgressEvent, { type: 'attacked' }>).hit);
+      const hit = getAttackHit(newP2);
+      p1Progress = { type: 'attacked', hit };
+      newP2 = applyDamage(newP2, hit);
     } else {
       p1Progress = getBuildProgress(p1);
       newP1 = applyProgress(newP1, p1Progress);
     }
   } else if (outcome === 'p2_wins') {
     if (isAttackPhase(p2)) {
-      const target = attackTarget ?? 'base';
-      p2Progress = resolveAttack(target, newP1);
-      newP1 = applyDamage(newP1, (p2Progress as Extract<ProgressEvent, { type: 'attacked' }>).hit);
+      const hit = getAttackHit(newP1);
+      p2Progress = { type: 'attacked', hit };
+      newP1 = applyDamage(newP1, hit);
     } else {
       p2Progress = getBuildProgress(p2);
       newP2 = applyProgress(newP2, p2Progress);
@@ -155,7 +129,6 @@ export function applyRound(state: GameState, attackTarget?: AttackTarget): GameS
     round: state.round + 1,
     p1: newP1,
     p2: newP2,
-    pendingAttackWinnerId: null,
     phase: winner ? 'gameover' : 'choosing',
     roundHistory: [...state.roundHistory, result],
     winner,
@@ -169,8 +142,8 @@ export function createInitialPlayer(id: string, name: string): PlayerState {
     fortressHp: 4,
     flags: 0,
     shields: 0,
-    hasCannon: false,
-    hasAircraft: false,
+    hasWeapon: false,
+    weaponDrawing: null,
     gesture: null,
     hasChosen: false,
   };
