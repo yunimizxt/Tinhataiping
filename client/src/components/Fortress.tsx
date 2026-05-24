@@ -1,8 +1,9 @@
 import React from 'react';
-import { View, Text, StyleSheet } from 'react-native';
+import { View, Text, StyleSheet, useWindowDimensions } from 'react-native';
 import Svg, { Path } from 'react-native-svg';
 import { PlayerState } from '@tinhataiping/shared';
 import { CharacterGrid } from './CharacterGrid';
+import { DRAW_CANVAS_W, DRAW_CANVAS_H } from './WeaponDrawingCanvas';
 import { colors } from '../theme/colors';
 
 interface Props {
@@ -11,79 +12,96 @@ interface Props {
   label?: string;
 }
 
-// Canvas dimensions used in WeaponDrawingCanvas
-const DRAW_CANVAS_W = 260;
-const DRAW_CANVAS_H = 160;
+interface DomeProps {
+  shields: number;
+  halfSpan: number; // rx of inner arc (half of arc span)
+}
 
-const BODY_W = 140;
-// Shield arcs are wider than the fortress body so they visually wrap around the sides
-const SHIELD_INNER_R = 110;   // arc spans 220px wide, extends 40px beyond each side
-const SHIELD_OUTER_R = 132;   // arc spans 264px wide
+function ShieldDome({ shields, halfSpan }: DomeProps) {
+  // Elliptical arcs: taller than wide so the arch rises dramatically above the fortress
+  const innerRx = halfSpan;
+  const innerRy = Math.round(halfSpan * 1.2);
+  const outerRx = halfSpan + 16;
+  const outerRy = innerRy + 20;
 
-function ShieldDome({ shields }: { shields: number }) {
-  if (shields === 0) return null;
+  const arcs = shields >= 2
+    ? [{ rx: innerRx, ry: innerRy }, { rx: outerRx, ry: outerRy }]
+    : [{ rx: innerRx, ry: innerRy }];
 
-  const outerR = shields >= 2 ? SHIELD_OUTER_R : SHIELD_INNER_R;
-  // SVG must be wide enough to contain the largest arc
-  const svgW = outerR * 2 + 6;
-  const svgH = outerR + 6;
+  const maxRx = arcs[arcs.length - 1].rx;
+  const maxRy = arcs[arcs.length - 1].ry;
+  const svgW = maxRx * 2 + 8;
+  const svgH = maxRy + 6;
   const cx = svgW / 2;
-  // Arc flat edge sits at the bottom of the SVG
-  const y = svgH - 2;
+  const y = svgH - 2; // arc endpoints sit at the very bottom of the SVG
 
   return (
-    // Negative marginBottom pulls the fortress body up so it sits inside the dome
-    <Svg width={svgW} height={svgH} style={styles.domeSvg}>
-      {Array.from({ length: shields }, (_, i) => {
-        const r = i === 0 ? SHIELD_INNER_R : SHIELD_OUTER_R;
-        const x1 = cx - r;
-        const x2 = cx + r;
-        // Slight fill to make the shield feel like a bubble
-        const fillOpacity = i === 0 ? 0.06 : 0.04;
-        return (
-          <Path
-            key={i}
-            d={`M ${x1},${y} A ${r},${r} 0 0,1 ${x2},${y}`}
-            stroke={colors.shieldBlue}
-            strokeWidth={3 + i * 2}
-            fill={`rgba(34,85,170,${fillOpacity})`}
-            strokeLinecap="round"
-          />
-        );
-      })}
+    <Svg width={svgW} height={svgH}>
+      {arcs.map(({ rx, ry }, i) => (
+        <Path
+          key={i}
+          d={`M ${cx - rx},${y} A ${rx},${ry} 0 0,1 ${cx + rx},${y}`}
+          stroke={colors.shieldBlue}
+          strokeWidth={3 + i * 2}
+          fill={`rgba(34,85,170,${i === 0 ? 0.07 : 0.04})`}
+          strokeLinecap="round"
+        />
+      ))}
     </Svg>
   );
 }
 
 export function Fortress({ player, isOpponent, label }: Props) {
+  const { width: screenW, height: screenH } = useWindowDimensions();
+  const scale = Math.min(screenW / 375, screenH / 812, 1.25);
+
+  const bodyW = Math.round(130 * scale);
+  const flagSize = Math.round(18 * scale);
+  const cellSize = Math.round(52 * scale);
+
+  // Dome: half-span based on screen width so it always fills nearly the full width
+  const halfSpan = Math.round(screenW * 0.44);
+
+  // Content height: flag row + gap + fortress body (2 cell rows + padding + border)
+  const contentH = Math.round(flagSize + 4 + cellSize * 2 + 4 + 16 + 6);
+
+  // Pull content up so its bottom aligns with the dome's arc base
+  const domeOverlap = -(contentH + 2);
+
   return (
     <View style={[styles.container, isOpponent && styles.flipped]}>
       {label && <Text style={[styles.label, isOpponent && styles.flippedText]}>{label}</Text>}
 
-      {/* Shield dome — sits above the fortress body, wider than it */}
-      <ShieldDome shields={player.shields} />
+      {/* Shield dome — drawn first; negative marginTop on content pulls it up inside */}
+      {player.shields > 0 && (
+        <ShieldDome shields={player.shields} halfSpan={halfSpan} />
+      )}
 
-      {/* Fortress body */}
-      <View style={styles.body}>
-        <CharacterGrid hp={player.fortressHp} />
+      {/* Fortress content: flags on top, grid below — both sit inside the dome */}
+      <View style={[
+        styles.fortressContent,
+        player.shields > 0 && { marginTop: domeOverlap },
+      ]}>
+        <View style={styles.flagRow}>
+          {Array.from({ length: 3 }).map((_, i) => (
+            <Text key={i} style={{ fontSize: flagSize }}>
+              {i < player.flags ? '🚩' : '▪️'}
+            </Text>
+          ))}
+        </View>
+
+        <View style={[styles.body, { width: bodyW }]}>
+          <CharacterGrid hp={player.fortressHp} scale={scale} />
+        </View>
       </View>
 
-      {/* Flags row */}
-      <View style={styles.flagRow}>
-        {Array.from({ length: 3 }).map((_, i) => (
-          <Text key={i} style={styles.flag}>
-            {i < player.flags ? '🚩' : '▪️'}
-          </Text>
-        ))}
-      </View>
-
-      {/* Drawn weapon — viewBox scales path from drawing canvas to display size */}
+      {/* Drawn weapon — viewBox scales path from 260×160 canvas to display size */}
       {player.hasWeapon && (
         <View style={styles.weaponBox}>
           {player.weaponDrawing ? (
             <Svg
-              width={80}
-              height={50}
+              width={Math.round(80 * scale)}
+              height={Math.round(50 * scale)}
               viewBox={`0 0 ${DRAW_CANVAS_W} ${DRAW_CANVAS_H}`}
             >
               <Path
@@ -96,12 +114,11 @@ export function Fortress({ player, isOpponent, label }: Props) {
               />
             </Svg>
           ) : (
-            <Text style={styles.weaponEmoji}>⚔️</Text>
+            <Text style={{ fontSize: Math.round(20 * scale) }}>⚔️</Text>
           )}
         </View>
       )}
 
-      {/* Build phase hint */}
       <Text style={[styles.hint, isOpponent && styles.flippedText]}>
         {getBuildHint(player)}
       </Text>
@@ -118,23 +135,20 @@ function getBuildHint(p: PlayerState): string {
 }
 
 const styles = StyleSheet.create({
-  container: { alignItems: 'center', gap: 0 },
+  container: { alignItems: 'center' },
   flipped: { transform: [{ scaleY: -1 }] },
   flippedText: { transform: [{ scaleY: -1 }] },
   label: { fontSize: 12, color: colors.stoneDark, fontWeight: '600', marginBottom: 2 },
-  // Pull the fortress body upward so it sits just inside the dome's open bottom
-  domeSvg: { marginBottom: -18 },
+  fortressContent: { alignItems: 'center', gap: 4 },
+  flagRow: { flexDirection: 'row', gap: 6 },
   body: {
     backgroundColor: colors.stoneMid,
     borderWidth: 3,
     borderColor: colors.stoneDark,
     borderRadius: 8,
     padding: 8,
-    width: BODY_W,
     alignItems: 'center',
   },
-  flagRow: { flexDirection: 'row', gap: 6, marginTop: 6 },
-  flag: { fontSize: 18 },
   weaponBox: {
     marginTop: 4,
     borderWidth: 1,
@@ -143,6 +157,5 @@ const styles = StyleSheet.create({
     padding: 4,
     backgroundColor: 'rgba(255,255,255,0.7)',
   },
-  weaponEmoji: { fontSize: 20 },
   hint: { fontSize: 10, color: colors.gray, marginTop: 2 },
 });
