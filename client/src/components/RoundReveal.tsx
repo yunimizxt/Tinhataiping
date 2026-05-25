@@ -50,6 +50,7 @@ function formatProgress(p: RoundResult['p1Progress']): string {
     case 'repaired_flag':   return '🔧 Repaired flag';
     case 'repaired_shield':   return '🔧 Repaired shield';
     case 'repaired_fortress': return '🔧 Repaired fortress';
+    case 'extra_defense':     return '🛡 Extra shield added!';
     case 'attacked':          return `💥 Hit ${p.hit}!`;
     default: return '';
   }

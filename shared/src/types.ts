@@ -11,6 +11,8 @@ export type GamePhase =
 
 export type RoundOutcome = 'p1_wins' | 'p2_wins' | 'draw';
 
+export type AttackChoice = 'attack' | 'add_defense' | 'new_weapon';
+
 export type ProgressEvent =
   | { type: 'built_flag' }
   | { type: 'built_shield' }
@@ -18,6 +20,7 @@ export type ProgressEvent =
   | { type: 'repaired_flag' }
   | { type: 'repaired_shield' }
   | { type: 'repaired_fortress' }
+  | { type: 'extra_defense' }
   | { type: 'attacked'; hit: HitResult };
 
 export interface PlayerState {

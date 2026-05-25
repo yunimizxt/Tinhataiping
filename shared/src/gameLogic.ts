@@ -22,7 +22,8 @@ export function resolveGesture(g1: Gesture, g2: Gesture): RoundOutcome {
 }
 
 export function isAttackPhase(player: PlayerState): boolean {
-  return player.flags === MAX_FLAGS && player.shields === MAX_SHIELDS && player.hasWeapon;
+  // >= MAX_SHIELDS so extra bonus shields (3+) don't drop out of attack phase
+  return player.flags === MAX_FLAGS && player.shields >= MAX_SHIELDS && player.hasWeapon;
 }
 
 export const MAX_FORTRESS_HP = 4;
@@ -72,6 +73,9 @@ export function applyProgress(player: PlayerState, event: ProgressEvent): Player
       break;
     case 'built_weapon':
       p.hasWeapon = true;
+      break;
+    case 'extra_defense':
+      p.shields = p.shields + 1; // bonus shield, no upper clamp
       break;
     case 'repaired_fortress':
       p.fortressHp = Math.min(MAX_FORTRESS_HP, p.fortressHp + 1);
